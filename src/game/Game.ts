@@ -39,6 +39,8 @@ export class Game {
   private afterMoveListeners: Array<() => void> = [];
   private aiThinking = false;
   private currentSet: PieceSetName = 'fantasy';
+  /** When true, executeMove snaps pieces to destination and skips capture VFX. For automated tests. */
+  testMode = false;
 
   constructor(private readonly scene: SceneManager) {
     this.scene.scene.add(this.board.group);
@@ -284,7 +286,17 @@ export class Game {
     // Move ordering depends on whether this is a capture:
     //  - Ranged attacker (bishop): cast spell FIRST from current square, target dies, THEN attacker glides in.
     //  - Melee/other (knight/pawn/rook/queen/king): walk in normally, then trigger capture VFX at destination.
-    if (capturedPiece && moving.type === 'b') {
+    if (this.testMode) {
+      // Test-mode fast path: snap moving piece, vaporize capture, skip VFX.
+      const toCoord = squareNameToCoord(move.to as any);
+      moving.coord = toCoord;
+      moving.mesh.position.copy(squareToWorld(toCoord, moving.baseY));
+      if (capturedPiece) {
+        this.scene.scene.remove(capturedPiece.mesh);
+        capturedPiece.dispose();
+        this.captureSideEffects(capturedPiece);
+      }
+    } else if (capturedPiece && moving.type === 'b') {
       this.playCaptureSound(moving);
       await this.captureFX.play(moving, capturedPiece);
       this.captureSideEffects(capturedPiece);
@@ -311,7 +323,12 @@ export class Game {
       const rookToCoord = { fileIdx: rookToFile, rankIdx: rank };
       const rook = this.squareMap.get(rookFromName);
       if (rook) {
-        await rook.moveTo(rookToCoord, 600);
+        if (this.testMode) {
+          rook.coord = rookToCoord;
+          rook.mesh.position.copy(squareToWorld(rookToCoord, rook.baseY));
+        } else {
+          await rook.moveTo(rookToCoord, 600);
+        }
         this.squareMap.delete(rookFromName);
         this.squareMap.set(coordToSquareName(rookToCoord), rook);
       }

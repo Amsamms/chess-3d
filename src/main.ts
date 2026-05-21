@@ -4,6 +4,7 @@ import { Game } from './game/Game';
 import { UI, GameMode, AIDifficulty } from './ui/UI';
 import { SoundEngine } from './engine/Sound';
 import { AIPlayer, Difficulty } from './ai/AIPlayer';
+import { gsap } from 'gsap';
 
 const loadingBar = document.getElementById('loading-bar-fill') as HTMLDivElement;
 const loadingStatus = document.getElementById('loading-status') as HTMLDivElement;
@@ -75,7 +76,7 @@ async function boot() {
   loop.start();
 
   // Dev hook for debugging / Playwright testing.
-  (window as unknown as { chess3d: unknown }).chess3d = { scene, game, ui, sound };
+  (window as unknown as { chess3d: unknown }).chess3d = { scene, game, ui, sound, gsap };
 
   setProgress(100, 'The realm awaits.');
   await new Promise((r) => setTimeout(r, 350));

@@ -48,12 +48,21 @@ export class StockfishEngine {
   /**
    * Ask the engine for the best move given current FEN + movetime budget.
    * Resolves once `bestmove <uci>` arrives.
+   *
+   * UCI hygiene matters: skipping the `readyok` wait between commands
+   * makes the WASM build trap with "unreachable" after several searches
+   * (especially across context switches like piece-set changes that reset
+   * the board). So we explicitly wait for `readyok` after `ucinewgame` and
+   * after `position fen` before issuing `go`.
    */
   async bestMove(fen: string, movetimeMs = 1000): Promise<BestMoveResult | null> {
     if (!this.worker) throw new Error('Engine not initialized');
+    // Belt-and-suspenders: halt any prior search before queuing new commands.
+    this.post('stop');
     this.post('ucinewgame');
+    await this.send('isready', (line) => line === 'readyok');
     this.post(`position fen ${fen}`);
-    this.post('isready');
+    await this.send('isready', (line) => line === 'readyok');
     return new Promise((resolve) => {
       const cleanup = this.addListener((line) => {
         if (line.startsWith('bestmove')) {
@@ -67,6 +76,16 @@ export class StockfishEngine {
       });
       this.post(`go movetime ${movetimeMs}`);
     });
+  }
+
+  /** Hard-reset: terminate the worker and clear state. Used between tests / set changes. */
+  dispose() {
+    if (this.worker) {
+      try { this.worker.terminate(); } catch { /* ignore */ }
+      this.worker = null;
+    }
+    this.msgListeners = [];
+    this.ready = false;
   }
 
   /** Stop any in-flight search. */

@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+.env
+.env.*
+!.env.example
+
+# Test screenshots & Playwright artifacts (not source)
+.playwright-mcp/
+canvas-*.txt
+canvas-*.jpg
+chess-*.png
+chess-*.jpg

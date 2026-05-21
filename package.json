@@ -1,0 +1,25 @@
+{
+  "name": "chess-3d-epic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chess.js": "^1.0.0-beta.8",
+    "gsap": "^3.12.5",
+    "postprocessing": "^6.36.4",
+    "stockfish": "^17.1.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "tweakpane": "^4.0.4",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3"
+  }
+}

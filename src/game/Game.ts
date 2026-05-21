@@ -16,6 +16,7 @@ import { VFXManager } from '../vfx/VFXManager';
 import { Prison } from '../vfx/Prison';
 import { CaptureFX } from '../vfx/CaptureFX';
 import { SoundEngine } from '../engine/Sound';
+import { PieceSetName } from '../sets/PieceSet';
 
 export class Game {
   private chess = new Chess();
@@ -37,6 +38,7 @@ export class Game {
   private sound: SoundEngine | null = null;
   private afterMoveListeners: Array<() => void> = [];
   private aiThinking = false;
+  private currentSet: PieceSetName = 'fantasy';
 
   constructor(private readonly scene: SceneManager) {
     this.scene.scene.add(this.board.group);
@@ -69,6 +71,14 @@ export class Game {
     this.ui?.setAiThinking(thinking);
   }
   isAiThinking(): boolean { return this.aiThinking; }
+
+  /** Swap the active piece set + restart the game so all pieces use the new look. */
+  setPieceSet(set: PieceSetName) {
+    if (this.currentSet === set) return;
+    this.currentSet = set;
+    this.reset();
+  }
+  getPieceSet(): PieceSetName { return this.currentSet; }
 
   async init() {
     this.spawnAllFromFen();
@@ -120,7 +130,7 @@ export class Game {
           const color: PieceColor = ch === ch.toUpperCase() ? 'w' : 'b';
           const type = ch.toLowerCase() as PieceType;
           const coord: SquareCoord = { fileIdx, rankIdx };
-          const piece = new Piece(color, type, coord);
+          const piece = new Piece(color, type, coord, this.currentSet);
           this.pieces.set(piece.id, piece);
           this.squareMap.set(coordToSquareName(coord), piece);
           this.scene.scene.add(piece.mesh);
@@ -312,7 +322,7 @@ export class Game {
       moving.dispose();
       this.scene.scene.remove(moving.mesh);
       this.pieces.delete(moving.id);
-      const promoted = new Piece(moving.color, move.promotion as PieceType, squareNameToCoord(move.to as any));
+      const promoted = new Piece(moving.color, move.promotion as PieceType, squareNameToCoord(move.to as any), this.currentSet);
       this.pieces.set(promoted.id, promoted);
       this.squareMap.set(move.to, promoted);
       this.scene.scene.add(promoted.mesh);

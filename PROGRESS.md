@@ -33,6 +33,28 @@ Build an epic 3D web-based chess game where pieces are living fantasy characters
 ## In-Progress Work
 - *(none — between sessions; user asked for an /ultrareview on the current code before continuing.)*
 
+## Session 2 additions (2026-05-22)
+- **Phase 9** Board square size 1.0 → 1.4, camera 14/16 → 18/22, controls/maxDist 36 → 55, shadow frustum 14 → 19, ornamental ring radius 8 → 11, knight scaled to 0.85 (its horse was the longest piece, overflowing 1.0 squares).
+- **Phase 10** Three piece sets:
+  - `classic` — Procedural Staunton (PieceFactory) with **imaginative motion**:
+    - pawn → `march` (stiff 2-hop step)
+    - rook → `roll` (forward tumble, ~1 rotation per 1.4 units of distance, snaps back to upright on arrival)
+    - knight → `leap` (L-shape mid-air pivot: traverses the long arm first, banks 90° at apex, drops onto destination)
+    - bishop → `spin` (full pirouette while gliding diagonally)
+    - queen → `levitate` (rises, glides high with gentle sway, descends in 3 phases)
+    - king → `march` (slow heavy step)
+  - `fantasy` — current Character system (knight on horse, robed wizard with glowing staff, crowned queen+scepter, bearded king, armored soldier-pawn, castle-tower rook). Knight uses `gallop` (shorter arc to feel like horse motion). All others `arc` (default hop+yaw).
+  - `neon` — New cyber pieces: tetrahedron pawn with halo, stacked-cube rook with antenna, angular wireframe knight, octahedron-prism bishop with 3 orbital rings, crystal-diamond queen with satellites, hexagonal-column king with cross. All `hover` (smooth glide, no rotation, subtle bob). Cyan/white core for white, hot-pink core for black. Heavily emissive → looks great with bloom.
+  - UI: new "Set: …" button cycles through. `game.setPieceSet(name)` rebuilds all pieces with new set. `Piece` constructor takes set name + uses `buildPiece()` dispatcher from `PieceSetFactory.ts`. `Piece.moveTo()` is now a dispatcher for 8 motion styles.
+- **Phase 11** Four swappable environments:
+  - `gothic-night` (default) — purple sky, stars, flickering torch, key light drifts, mossy stone dais.
+  - `garden-day` — bright sky, sun disk (shader-driven), white clouds, hemi+sun lighting, grass texture, stone path around board, wreath ring, scattered flowers (60), 6 trees, drifting petals.
+  - `ice-realm` — glacial blue/star-lit night, animated aurora ribbon (shader), snowflakes (600), 4 cyan glow lights around board, snowy ground, silver ring, 8 crystal spires, 7 snowy pines.
+  - `volcano` — dark-red sky, 4 distant volcanoes with glowing peaks, 14 lava fissures pulsing on the floor, embers rising, ash falling, charred rocks with lava cracks, molten metal ring.
+  - Architecture: `src/environments/Environment.ts` (abstract base with `build()` + `update()` + `dispose()`), `EnvironmentManager` owns the active env and swaps cleanly. `SceneManager.setEnvironment(name)` switches at runtime (disposes old, builds new). Each env owns ALL its scene additions under a `THREE.Group` so disposal is total.
+  - UI: new "Realm: …" button cycles. Renderer exposure tuned per env (1.05–1.25).
+- **Phase 12** End-to-end verified: ran capture sequences in Classic+Garden, AI mode in Neon+Volcano (Stockfish replied to e4 with c5 in 200ms), Fantasy+Gothic (already known working). All combinations tested without artifacts. Switching mid-game disposes old pieces/env and rebuilds.
+
 ## End-of-session state (2026-05-21)
 - 4,845 lines of TypeScript across 24 files. Production build succeeds (`npm run build` → 737 KB JS gzipped to 200 KB, plus 7 MB Stockfish WASM).
 - All gameplay features functional in local dev (http://localhost:5173): hot-seat, Vs AI (white or black) with 4 difficulty presets, mode/skill toggles, sound on/off.

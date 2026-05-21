@@ -64,6 +64,8 @@ async function boot() {
   };
   ui.onModeChange(applyMode);
   ui.onDifficultyChange(applyDifficulty);
+  ui.onEnvironmentChange((env) => scene.setEnvironment(env));
+  ui.onPieceSetChange((set) => game.setPieceSet(set));
 
   const loop = new Loop((dt) => {
     scene.update(dt);

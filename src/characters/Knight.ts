@@ -122,6 +122,9 @@ export class Knight extends Character {
     this.rider.leftShoulder.rotation.x = -0.20;
     this.rider.leftShoulder.rotation.z = 0.15;
 
+    // Knight + horse is the longest piece (~1.5u deep) — shrink so it fits comfortably in a square.
+    this.root.scale.setScalar(0.85);
+
     enableShadows(this.root);
   }
 

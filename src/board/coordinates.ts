@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const SQUARE_SIZE = 1.0;
+export const SQUARE_SIZE = 1.4;
 export const BOARD_DIM = 8 * SQUARE_SIZE;
 export const BOARD_Y_TOP = 0.18; // top of the board slab — pieces sit here
 

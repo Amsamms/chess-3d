@@ -1,5 +1,8 @@
 import { PieceColor, PieceType } from '../pieces/PieceFactory';
 import type { SoundEngine } from '../engine/Sound';
+import { EnvironmentName } from '../environments/Environment';
+import { ENVIRONMENT_LABELS, ENVIRONMENT_ORDER } from '../environments/EnvironmentManager';
+import { PIECE_SET_LABELS, PIECE_SET_ORDER, PieceSetName } from '../sets/PieceSet';
 
 interface UIState {
   turn: PieceColor;
@@ -23,6 +26,12 @@ export class UI {
   private restartHandlers: Array<() => void> = [];
   private modeHandlers: Array<(m: GameMode) => void> = [];
   private difficultyHandlers: Array<(d: AIDifficulty) => void> = [];
+  private envHandlers: Array<(e: EnvironmentName) => void> = [];
+  private setHandlers: Array<(s: PieceSetName) => void> = [];
+  private envBtn!: HTMLButtonElement;
+  private setBtn!: HTMLButtonElement;
+  private currentEnv: EnvironmentName = 'gothic-night';
+  private currentSet: PieceSetName = 'fantasy';
   private turnLabel!: HTMLElement;
   private turnOrb!: HTMLElement;
   private statusEl!: HTMLElement;
@@ -75,6 +84,8 @@ export class UI {
         <div class="captured-list" id="captured-right"></div>
       </div>
       <div class="hud-controls">
+        <button class="hud-btn" id="btn-set" title="Piece set">Set: Fantasy</button>
+        <button class="hud-btn" id="btn-env" title="Realm / environment">Realm: Gothic Night</button>
         <button class="hud-btn" id="btn-mode" title="Game mode">Mode: Hot-seat</button>
         <button class="hud-btn" id="btn-difficulty" title="AI difficulty" style="display:none">Skill: Intermediate</button>
         <button class="hud-btn" id="btn-sound" title="Toggle sound">Sound: On</button>
@@ -120,7 +131,30 @@ export class UI {
       this.difficultyBtn.textContent = `Skill: ${this.difficultyLabel[next]}`;
       for (const fn of this.difficultyHandlers) fn(next);
     });
+
+    this.envBtn = document.getElementById('btn-env') as HTMLButtonElement;
+    this.envBtn.addEventListener('click', () => {
+      const idx = ENVIRONMENT_ORDER.indexOf(this.currentEnv);
+      const next = ENVIRONMENT_ORDER[(idx + 1) % ENVIRONMENT_ORDER.length]!;
+      this.currentEnv = next;
+      this.envBtn.textContent = `Realm: ${ENVIRONMENT_LABELS[next]}`;
+      for (const fn of this.envHandlers) fn(next);
+    });
+
+    this.setBtn = document.getElementById('btn-set') as HTMLButtonElement;
+    this.setBtn.addEventListener('click', () => {
+      const idx = PIECE_SET_ORDER.indexOf(this.currentSet);
+      const next = PIECE_SET_ORDER[(idx + 1) % PIECE_SET_ORDER.length]!;
+      this.currentSet = next;
+      this.setBtn.textContent = `Set: ${PIECE_SET_LABELS[next]}`;
+      for (const fn of this.setHandlers) fn(next);
+    });
   }
+
+  onEnvironmentChange(fn: (e: EnvironmentName) => void) { this.envHandlers.push(fn); }
+  getEnvironment(): EnvironmentName { return this.currentEnv; }
+  onPieceSetChange(fn: (s: PieceSetName) => void) { this.setHandlers.push(fn); }
+  getPieceSet(): PieceSetName { return this.currentSet; }
 
   setAiThinking(thinking: boolean) {
     this.aiThinkingEl.style.display = thinking ? '' : 'none';

@@ -17,7 +17,8 @@ export class StockfishEngine {
 
   async init(): Promise<void> {
     if (this.worker) return;
-    this.worker = new Worker('/stockfish/stockfish.js');
+    // Use BASE_URL so the worker URL gets prefixed (e.g. `/chess-3d/` on GitHub Pages).
+    this.worker = new Worker(`${import.meta.env.BASE_URL}stockfish/stockfish.js`);
     this.worker.onmessage = (e: MessageEvent<string>) => {
       const line = typeof e.data === 'string' ? e.data : String(e.data);
       // Fan out to listeners

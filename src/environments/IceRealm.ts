@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Environment } from './Environment';
+import { Quality } from '../engine/Quality';
 
 /**
  * Frozen tundra at dusk — glacial blue sky with aurora ribbons, snowy
@@ -56,7 +57,7 @@ export class IceRealm extends Environment {
 
     // --- Stars
     const starGeo = new THREE.BufferGeometry();
-    const N = 1800;
+    const N = Math.round(1800 * Quality.particleScale());
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -115,7 +116,8 @@ export class IceRealm extends Environment {
     const moon = new THREE.DirectionalLight(0xc8e8ff, 1.3);
     moon.position.set(10, 18, -8);
     moon.castShadow = true;
-    moon.shadow.mapSize.set(1024, 1024);
+    const shadowSize = Quality.shadowMapSize();
+    moon.shadow.mapSize.set(shadowSize, shadowSize);
     moon.shadow.camera.near = 0.5;
     moon.shadow.camera.far = 70;
     const s = 19;
@@ -192,7 +194,7 @@ export class IceRealm extends Environment {
   }
 
   private makeSnowflakes() {
-    const N = 600;
+    const N = Math.round(600 * Quality.particleScale());
     const positions = new Float32Array(N * 3);
     this.snowVel = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {

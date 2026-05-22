@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Environment } from './Environment';
+import { Quality } from '../engine/Quality';
 
 /**
  * Sunlit garden — bright blue sky, soft white clouds, green grass plaza
@@ -77,7 +78,8 @@ export class GardenDay extends Environment {
     const sun = new THREE.DirectionalLight(0xfff4d0, 2.1);
     sun.position.set(11, 22, 8);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    const shadowSize = Quality.shadowMapSize();
+    sun.shadow.mapSize.set(shadowSize, shadowSize);
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 80;
     const s = 19;
@@ -161,7 +163,7 @@ export class GardenDay extends Environment {
   }
 
   private makePetals() {
-    const N = 220;
+    const N = Math.round(220 * Quality.particleScale());
     const positions = new Float32Array(N * 3);
     const colors = new Float32Array(N * 3);
     this.petalVel = new Float32Array(N * 3);

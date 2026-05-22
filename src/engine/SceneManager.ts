@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PostFX } from './PostFX';
 import { EnvironmentManager } from '../environments/EnvironmentManager';
 import { EnvironmentName } from '../environments/Environment';
+import { Quality, QualityMode } from './Quality';
 
 export class SceneManager {
   readonly scene = new THREE.Scene();
@@ -12,6 +13,7 @@ export class SceneManager {
   readonly post: PostFX;
   readonly env: EnvironmentManager;
   private readonly clock = new THREE.Clock();
+  private currentEnvName: EnvironmentName = 'gothic-night';
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -21,9 +23,9 @@ export class SceneManager {
       stencil: false,
       preserveDrawingBuffer: true, // allows canvas.toDataURL() for screenshots
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, Quality.pixelRatioCap()));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = Quality.shadowsEnabled();
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
@@ -47,11 +49,17 @@ export class SceneManager {
 
     this.post = new PostFX(this.renderer, this.scene, this.camera);
     this.post.setSize(window.innerWidth, window.innerHeight);
+    this.post.setBypass(!Quality.bloomEnabled());
+
+    // Initial framing so portrait phones get the whole board on first paint.
+    this.applyAspect(window.innerWidth, window.innerHeight);
 
     window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('orientationchange', () => this.onResize());
   }
 
   setEnvironment(name: EnvironmentName) {
+    this.currentEnvName = name;
     this.env.set(name);
     // Re-tune renderer exposure / fog density depending on environment vibe.
     // (Done inside the Environment via scene.background/fog; renderer-level tuning here.)
@@ -63,11 +71,44 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Switch quality preset. Updates Quality singleton, toggles renderer
+   * shadows + PostFX bypass + pixel ratio, then rebuilds the current
+   * environment so its lights pick up the new shadow map size and its
+   * particle systems rebuild at the new density.
+   */
+  setQuality(mode: QualityMode) {
+    Quality.set(mode);
+    this.renderer.shadowMap.enabled = Quality.shadowsEnabled();
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, Quality.pixelRatioCap()));
+    this.post.setBypass(!Quality.bloomEnabled());
+    // Rebuild the live environment so lights re-init their shadow maps and
+    // particle systems re-build at the new density.
+    this.env.set(this.currentEnvName);
+  }
+
+  /**
+   * Adjust camera FOV so the board horizontally fits across narrow (portrait)
+   * viewports. Keeps the fixed-position camera but widens the vertical FOV
+   * when the aspect ratio drops below desktop-ish, which is equivalent to a
+   * minimum horizontal FOV guarantee.
+   */
+  private applyAspect(w: number, h: number) {
+    const aspect = w / h;
+    this.camera.aspect = aspect;
+    // Guarantee at least ~60° of horizontal FOV so the board edges don't fall off
+    // the sides on tall portrait phones.
+    const minHorizontalFovRad = THREE.MathUtils.degToRad(60);
+    const computedVerticalRad = 2 * Math.atan(Math.tan(minHorizontalFovRad / 2) / aspect);
+    const computedVerticalDeg = THREE.MathUtils.radToDeg(computedVerticalRad);
+    this.camera.fov = Math.max(45, Math.min(95, computedVerticalDeg));
+    this.camera.updateProjectionMatrix();
+  }
+
   private onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.applyAspect(w, h);
     this.renderer.setSize(w, h);
     this.post.setSize(w, h);
   }

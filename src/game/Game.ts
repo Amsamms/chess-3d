@@ -41,6 +41,18 @@ export class Game {
   private currentSet: PieceSetName = 'fantasy';
   /** When true, executeMove snaps pieces to destination and skips capture VFX. For automated tests. */
   testMode = false;
+  /**
+   * When non-null, user input is restricted: 'spectator' blocks ALL input;
+   * 'w' / 'b' allows input only when it's that color's turn. Set by main.ts
+   * via setInputColorLock() when entering online mode so users can't move
+   * the opponent's pieces or interact while watching.
+   */
+  private inputColorLock: 'w' | 'b' | 'spectator' | null = null;
+
+  setInputColorLock(lock: 'w' | 'b' | 'spectator' | null) {
+    this.inputColorLock = lock;
+    if (lock === 'spectator') this.deselect();
+  }
 
   constructor(private readonly scene: SceneManager) {
     this.scene.scene.add(this.board.group);
@@ -146,6 +158,9 @@ export class Game {
     if (this.animatingMove) return;
     if (this.aiThinking) return;
     if (this.chess.isGameOver()) return;
+    // Online-mode input gating: spectators get no input; players only act on their turn.
+    if (this.inputColorLock === 'spectator') return;
+    if (this.inputColorLock && this.chess.turn() !== this.inputColorLock) return;
 
     const rect = this.scene.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;

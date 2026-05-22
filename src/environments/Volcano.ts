@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Environment } from './Environment';
+import { Quality } from '../engine/Quality';
 
 /**
  * Lava-pit arena — angry red sky, ash-fall, distant volcanos, glowing lava
@@ -81,7 +82,8 @@ export class Volcano extends Environment {
     const key = new THREE.DirectionalLight(0xff8a3a, 1.5);
     key.position.set(8, 14, 6);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    const shadowSize = Quality.shadowMapSize();
+    key.shadow.mapSize.set(shadowSize, shadowSize);
     key.shadow.camera.near = 0.5;
     key.shadow.camera.far = 70;
     const s = 19;
@@ -172,7 +174,7 @@ export class Volcano extends Environment {
   }
 
   private makeEmbers() {
-    const N = 260;
+    const N = Math.round(260 * Quality.particleScale());
     const positions = new Float32Array(N * 3);
     const colors = new Float32Array(N * 3);
     this.emberVel = new Float32Array(N * 3);
@@ -208,7 +210,7 @@ export class Volcano extends Environment {
   }
 
   private makeAsh() {
-    const N = 350;
+    const N = Math.round(350 * Quality.particleScale());
     const positions = new Float32Array(N * 3);
     this.ashVel = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {

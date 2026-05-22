@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Environment } from './Environment';
+import { Quality } from '../engine/Quality';
 
 /**
  * The original purple-night look — moon-key light, purple rim, flickering
@@ -56,7 +57,7 @@ export class GothicNight extends Environment {
 
     // --- Stars
     const starGeo = new THREE.BufferGeometry();
-    const N = 1400;
+    const N = Math.round(1400 * Quality.particleScale());
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -81,7 +82,8 @@ export class GothicNight extends Environment {
     this.key = new THREE.DirectionalLight(0xfff1cc, 1.4);
     this.key.position.set(8, 16, 6);
     this.key.castShadow = true;
-    this.key.shadow.mapSize.set(1024, 1024);
+    const shadowSize = Quality.shadowMapSize();
+    this.key.shadow.mapSize.set(shadowSize, shadowSize);
     this.key.shadow.camera.near = 0.5;
     this.key.shadow.camera.far = 60;
     const s = 19;

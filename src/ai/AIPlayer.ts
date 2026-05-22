@@ -26,25 +26,42 @@ export class AIPlayer {
   private active = false;
   private aiColor: AIColor = 'b';
   private difficulty: Difficulty = 'intermediate';
+  /**
+   * Bumped on every stop() call. start() captures the current value at entry
+   * and only finalizes (sets active=true, hooks listener, triggers maybeMove)
+   * if no stop arrived during its async init. Without this, a stop() that
+   * fires while engine.init() is awaiting WASM load is silently overwritten
+   * when start() resumes — and the AI plays a ghost move into whatever mode
+   * the user has since switched to (e.g., a freshly-created online room).
+   */
+  private startEpoch = 0;
+  private listenerSubscribed = false;
 
   constructor(private readonly game: Game) {}
 
   async start(aiColor: AIColor, difficulty: Difficulty): Promise<void> {
     this.aiColor = aiColor;
     this.difficulty = difficulty;
+    this.startEpoch += 1;
+    const myEpoch = this.startEpoch;
     if (!this.engine.isReady()) {
       await this.engine.init();
     }
+    // If stop() (or another start) ran while we were awaiting init, give up.
+    if (myEpoch !== this.startEpoch) return;
     this.engine.setSkill(DIFFICULTY_PRESETS[difficulty].skill);
     this.active = true;
-    // Subscribe to game move events
-    this.game.onAfterMove(() => this.maybeMove());
-    // Trigger immediately if it's AI's turn (e.g., AI plays white)
+    // Subscribe ONCE — repeat starts shouldn't keep stacking listeners.
+    if (!this.listenerSubscribed) {
+      this.game.onAfterMove(() => this.maybeMove());
+      this.listenerSubscribed = true;
+    }
     this.maybeMove();
   }
 
   stop() {
     this.active = false;
+    this.startEpoch += 1; // invalidate any in-flight start()
     this.engine.stop();
   }
 

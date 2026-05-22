@@ -247,11 +247,16 @@ body {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.08s ease;
   backdrop-filter: blur(6px);
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(247, 230, 169, 0.15);
+  /* Touch tap UX: kill the default blue/grey flash so :active feedback is the
+     authored one, not a system overlay. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
 }
 .hud-btn:hover {
   background: linear-gradient(180deg, rgba(60, 36, 80, 0.9), rgba(30, 18, 42, 0.95));
@@ -259,6 +264,12 @@ body {
   box-shadow:
     0 6px 22px rgba(196, 122, 60, 0.35),
     inset 0 1px 0 rgba(247, 230, 169, 0.25);
+}
+.hud-btn:active {
+  /* Touch users get no :hover — make sure a tap produces visible press feedback. */
+  transform: scale(0.97);
+  background: linear-gradient(180deg, rgba(80, 48, 110, 0.95), rgba(40, 24, 56, 0.98));
+  border-color: rgba(247, 230, 169, 0.85);
 }
 
 .hud-hint {
@@ -322,6 +333,99 @@ body {
   50% { transform: scale(1.35); opacity: 0.55; }
 }
 
+/* Online multiplayer panel */
+.online-panel {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 320px;
+  max-width: 92vw;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.95), rgba(12, 8, 18, 0.95));
+  border: 1px solid rgba(196, 122, 60, 0.55);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(247, 230, 169, 0.18);
+  pointer-events: auto;
+  z-index: 20;
+}
+.online-panel-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #f7e6a9;
+  text-align: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(196, 122, 60, 0.3);
+}
+.online-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.online-btn {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
+}
+.online-btn-sm {
+  padding: 6px 12px;
+  font-size: 0.7rem;
+}
+.online-panel-status {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: #c9a566;
+  text-align: center;
+  padding: 4px 0;
+}
+.online-panel-status.online-error {
+  color: #ff7a4a;
+}
+.online-panel-code {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: #f3e9c8;
+}
+.online-panel-code span {
+  color: #f7e6a9;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  margin-left: 6px;
+}
+.online-panel-share {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.online-panel-share input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(10, 6, 16, 0.6);
+  border: 1px solid rgba(196, 122, 60, 0.35);
+  border-radius: 3px;
+  color: #f3e9c8;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.8rem;
+  min-width: 0; /* allow shrink in flex */
+}
+.online-panel-share input:focus {
+  outline: 1px solid rgba(247, 230, 169, 0.5);
+}
+.online-leave {
+  align-self: center;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
 /* Game over modal */
 .game-over-modal {
   position: absolute;
@@ -364,4 +468,141 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* =================== RESPONSIVE — PHONES & SMALL TABLETS =================== */
+
+/*
+ * Reflow strategy on phones:
+ *   - Turn card shrinks but stays top-center.
+ *   - Captured trays become half-width chips immediately under the turn card,
+ *     instead of the desktop's tall 110px columns at the side (which overlapped
+ *     the board on a narrow viewport).
+ *   - Hint paragraph is hidden — the trays + controls already cover everything
+ *     useful, and the bottom is reserved for the button strip.
+ *   - Controls reflow as a wrapping row at the very bottom, full-width-minus-
+ *     margins, each button min-height 44px so they meet touch-target specs.
+ *   - AI-thinking indicator moves above the button row so it isn't covered.
+ */
+@media (max-width: 720px), (max-height: 540px) {
+  .hud-top { top: 10px; }
+  .hud-turn-card {
+    padding: 8px 14px;
+    gap: 10px;
+    border-radius: 5px;
+  }
+  .hud-turn-orb {
+    width: 16px;
+    height: 16px;
+  }
+  .hud-turn-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+  }
+  .hud-status {
+    margin-top: 6px;
+    font-size: 0.9rem;
+  }
+  .hud-status.checkmate,
+  .hud-status.stalemate {
+    font-size: 1.1rem;
+  }
+
+  .captured-tray {
+    top: 64px;
+    width: calc(50% - 12px);
+    padding: 6px 8px;
+    border-radius: 5px;
+  }
+  .captured-tray.left  { left: 6px; }
+  .captured-tray.right { right: 6px; }
+  .captured-tray-title {
+    font-size: 0.55rem;
+    margin-bottom: 4px;
+    padding-bottom: 3px;
+    letter-spacing: 0.15em;
+  }
+  .captured-list {
+    font-size: 1.1rem;
+    gap: 2px;
+  }
+
+  .hud-hint {
+    /* Desktop hint takes up bottom-left, which we need for the controls strip. */
+    display: none;
+  }
+
+  .hud-controls {
+    bottom: 8px;
+    left: 6px;
+    right: 6px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    align-items: stretch;
+  }
+  .hud-btn {
+    flex: 1 1 auto;
+    min-height: 44px; /* Apple HIG / Material touch-target minimum */
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    gap: 4px;
+  }
+
+  .ai-thinking {
+    /* Move above the button strip — bottom is occupied by controls now. */
+    bottom: auto;
+    top: 130px;
+    left: 6px;
+    right: 6px;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+  }
+
+  .game-over-card {
+    padding: 28px 32px;
+  }
+  .game-over-subtitle {
+    font-size: 1.05rem;
+    margin-bottom: 1.3rem;
+  }
+}
+
+/* Tiny phones (≤ 380 wide): trim button labels further so 7 of them fit. */
+@media (max-width: 380px) {
+  .hud-btn {
+    font-size: 0.62rem;
+    padding: 10px 8px;
+    letter-spacing: 0.08em;
+  }
+  .captured-tray-title {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+  }
+  .captured-list {
+    font-size: 0.95rem;
+  }
+}
+
+/* Landscape phone (short height, regular width): keep trays at the sides
+ * since horizontal room is fine, but still shrink the button strip vertically
+ * and move it to the bottom row so it doesn't eat the right edge. */
+@media (max-height: 480px) and (min-width: 720px) {
+  .captured-tray { top: 78px; width: 90px; padding: 8px 8px; }
+  .hud-controls {
+    bottom: 8px;
+    right: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: calc(100% - 16px);
+    justify-content: flex-end;
+  }
+  .hud-btn { min-height: 40px; padding: 8px 12px; font-size: 0.7rem; }
+  .hud-hint { display: none; }
 }

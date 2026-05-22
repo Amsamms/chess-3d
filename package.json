@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
     "chess.js": "^1.0.0-beta.8",
     "gsap": "^3.12.5",
     "postprocessing": "^6.36.4",

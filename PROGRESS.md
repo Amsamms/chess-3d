@@ -92,3 +92,50 @@ Build an epic 3D web-based chess game where pieces are living fantasy characters
 - "Epic like PUBG" was framed honestly with Ahmed: literal AAA quality (Unreal-tier) is years/millions out of scope; we're targeting "visually rich web-based 3D" which is genuinely impressive but not literal PUBG.
 - Mixamo requires Adobe login — if we use it I'll automate with Playwright (Gmail SSO works). Quaternius / Kenney CC0 packs are easier (direct download, no login).
 - Procedural pieces ship first to unblock gameplay; characters swap in later. This is intentional, not a compromise on quality — it keeps the project shippable at each phase.
+
+## Session 3 (2026-06-13): Multi-agent audit + 22-fix pass + deploy
+
+### What happened
+Ran two multi-agent workflows against the LIVE game (https://amsamms.github.io/chess-3d/).
+1. Audit workflow (9 dimension auditors, opus/sonnet, 32 agents total, ~63 min): scored the game and produced a roadmap. Verdict honesty: Epic ~5.25/10, Good ~6.2/10, Addictive ~4.0/10. 22 issues confirmed by adversarial verification (0 refuted).
+2. Fix-and-verify workflow (10 fix packages + tests + adversarial review): implemented all 22 fixes, then validated.
+
+### The 22 fixes (all landed, commit ea516dd on main)
+- F1 promotion picker (Q/R/B/N) for human moves; AI/network/devMove pass promotion through (Game.ts requestMove/openPromotionPicker).
+- F2 localStorage profile: games, W/L/D per tier, win streaks (src/meta/Profile.ts, key chess3d.profile.v1).
+- F3 daily puzzle: lichess /api/puzzle/daily with offline fallback set (src/puzzle/DailyPuzzle.ts + fallback.ts), streak in profile counters, key chess3d.puzzle.<UTC-date>.
+- F4 granular results: checkmate/stalemate/threefold/fifty-move/insufficient-material/resignation/timeout/abandonment (Game.ts GameResultKind).
+- F5 restart-vs-AI race: ai.stop() before reset, flags cleared, AI re-armed (main.ts, AIPlayer startEpoch guard).
+- F6/F7 RLS holes: BEFORE UPDATE trigger enforce_game_invariants + resign_game() SECURITY DEFINER (migration 003).
+- F8 presence/disconnect banner + claim-win (MultiplayerSession Presence).
+- F9 submit move right after chess.move(), decoupled from animation.
+- F10 Beginner AI recalibrated (skill 0, movetime 100ms, weighted MultiPV 4) + opening variety + bestmove timeout.
+- F11 Gothic Night brightened (exposure 1.30, hemi 0.85, uplight, lighter dais).
+- F12 IBL: PMREM env map set as scene.environment, per-realm environmentIntensity.
+- F13 CameraDirector: intro orbit, capture shake, checkmate dolly + king topple + confetti; respects prefers-reduced-motion; window.chess3d.cinematicActive flag.
+- F14 settings persistence (src/meta/Settings.ts, key chess3d.settings.v1).
+- F15 unlock ladder (src/meta/Unlocks.ts): Fantasy+Gothic default, rest gated on milestones.
+- F16 first-run onboarding overlay + persistent "?" button.
+- F17 shareable game-over result string + Copy.
+- F18 Fischer clock (online), per-move checkpoints (white_ms/black_ms columns), timeout result.
+- F19 rematch over Realtime broadcast, reuses room, swaps colors.
+- F20 texture leak fixed: Environment.dispose() disposes CanvasTextures.
+- F21 single clock.getDelta() per frame.
+- F22 sub-items: AI-turn input lock, bestmove timeout, queue UNIQUE + stale cleanup, tap-vs-drag gate, particle dt cap, dev hook gated behind import.meta.env.DEV || ?dev=1, prod sourcemaps off, tweakpane removed, favicon added.
+
+### Verification
+- tsc --noEmit PASS, vite build PASS (298.9 KB gzip JS + 7 MB stockfish WASM).
+- Adversarial final review (opus): all 22 fixed, no regressions, devMove correctly bypasses the picker (takes a promotion arg), no em-dashes added, no commits during review.
+- Live tests: online 2-browser suite 7/9 (the 2 fails were: resign_game 404 = pre-migration, now fixed by 003; and hard-reload-rejoin gets a new anon UUID = known reconnect-identity limitation, see Leftovers).
+- rules-ux + visual-cinematic suites are CODE-VERIFIED ONLY: the GPU-less WSL test env runs software WebGL at ~1.4 FPS, which hung browser-driving test agents (evaluate-of-promise has no Playwright timeout). Manual smoke test on dev + prod confirmed: 0 console errors, IBL active, cinematics running, profile/settings/daily stores present, all HUD buttons present, Gothic Night near-black down from 79.6% to 31.9%.
+
+### Deploy (done 2026-06-13)
+- Source committed ea516dd, pushed master -> origin/main.
+- dist/ force-pushed to gh-pages (449b965). Live build asset: index-CAr0VeOS.js. Title fixed to "Chess 3D - Epic Edition" (hyphen).
+- Migration 003 APPLIED to production Supabase (mliblrxegsrylebaslhr) via Management API. Verified: enforce_game_invariants trigger, resign_game (security definer), queue_player_id_unique, white_ms/black_ms columns all present.
+- Production smoke test: 0 console errors, dev hook gated (window.chess3d undefined without ?dev=1), resign_game RPC returns 400 not 404.
+
+### Known leftovers (not blockers)
+- Online hard-reload reconnect: a page reload assigns a new anonymous UUID, so rejoining a room that holds your OLD uuid in the black seat fails (stuck on "Opening the gates..."). Fix idea: persist the anon session token / identity across reloads, or store a rejoin token. Presence/disconnect otherwise works.
+- rules-ux + visual-cinematic never ran live (GPU-less host). Recommend one manual pass on a real GPU: promotion picker on a human pawn-to-8th, the checkmate dolly+topple+confetti, a realm switch (F20 leak is non-visible, check renderer.info.memory.textures).
+- Hot-seat decisive games count as gamesPlayed but are excluded from streak (by design).

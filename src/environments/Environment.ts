@@ -23,17 +23,48 @@ export abstract class Environment {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.geometry?.dispose();
-        const mat = m.material as THREE.Material | THREE.Material[];
-        if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
-        else mat?.dispose();
+        disposeMaterials(m.material);
       } else if ((o as THREE.Points).isPoints) {
         const p = o as THREE.Points;
         p.geometry?.dispose();
-        (p.material as THREE.Material).dispose();
+        disposeMaterials(p.material);
       }
     });
     this.group.parent?.remove(this.group);
   }
+}
+
+/**
+ * Dispose a material (or array of materials) AND every CanvasTexture / Texture
+ * hung off it. Plain material.dispose() does not free GPU textures, so the
+ * procedurally generated stone / grass / snow / rock canvas textures leaked
+ * roughly a few MB of VRAM on every realm switch. We walk the known PBR texture
+ * slots so all four environments benefit without per-environment bookkeeping.
+ */
+const TEXTURE_SLOTS = [
+  'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+  'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap',
+  'displacementMap', 'lightMap', 'envMap', 'specularMap',
+] as const;
+
+function disposeMaterials(mat: THREE.Material | THREE.Material[] | undefined): void {
+  if (!mat) return;
+  if (Array.isArray(mat)) {
+    mat.forEach(disposeOneMaterial);
+  } else {
+    disposeOneMaterial(mat);
+  }
+}
+
+function disposeOneMaterial(mat: THREE.Material): void {
+  const anyMat = mat as unknown as Record<string, unknown>;
+  for (const slot of TEXTURE_SLOTS) {
+    const tex = anyMat[slot] as THREE.Texture | null | undefined;
+    if (tex && typeof (tex as THREE.Texture).dispose === 'function') {
+      tex.dispose();
+    }
+  }
+  mat.dispose();
 }
 
 export type EnvironmentName = 'gothic-night' | 'garden-day' | 'ice-realm' | 'volcano';

@@ -3,7 +3,7 @@ import { Environment } from './Environment';
 import { Quality } from '../engine/Quality';
 
 /**
- * The original purple-night look — moon-key light, purple rim, flickering
+ * The original purple-night look: moon-key light, purple rim, flickering
  * torch, starfield, mossy stone dais with gold ring, exponential fog.
  */
 export class GothicNight extends Environment {
@@ -76,8 +76,18 @@ export class GothicNight extends Environment {
     ));
 
     // --- Lights
-    const hemi = new THREE.HemisphereLight(0xffe5b0, 0x1a0d28, 0.55);
+    // Lifted from 0.55 to 0.85 so the scene is no longer near-black. The sky
+    // (top) color stays warm gold and the ground color a cool purple, keeping
+    // the gothic mood while raising the overall floor of visible luminance.
+    const hemi = new THREE.HemisphereLight(0xffe5b0, 0x2a1840, 0.85);
     this.group.add(hemi);
+
+    // Cool uplight near the board: a low point light tinted moonlit-violet that
+    // grazes the dais so black pieces separate from the dark squares without
+    // washing the moody palette. Sits just under the board, aimed up.
+    const uplight = new THREE.PointLight(0x8a6cff, 0.9, 26, 1.8);
+    uplight.position.set(0, -0.2, 0);
+    this.group.add(uplight);
 
     this.key = new THREE.DirectionalLight(0xfff1cc, 1.4);
     this.key.position.set(8, 16, 6);
@@ -105,7 +115,10 @@ export class GothicNight extends Environment {
     this.group.add(this.torch);
 
     // --- Ground (stone dais + gold ring)
-    const stoneTex = makeStoneTexture(1024, '#3a2c40', '#160820');
+    // Brightened stone (was #3a2c40 / #160820) plus a lighter base tint and a
+    // faint cool emissive so the dais no longer reads as near-black and gives
+    // the dark pieces something to stand against.
+    const stoneTex = makeStoneTexture(1024, '#564468', '#241038');
     stoneTex.colorSpace = THREE.SRGBColorSpace;
     stoneTex.wrapS = THREE.RepeatWrapping;
     stoneTex.wrapT = THREE.RepeatWrapping;
@@ -114,7 +127,14 @@ export class GothicNight extends Environment {
 
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(50, 64),
-      new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.92, metalness: 0.05, color: 0x4a3a52 }),
+      new THREE.MeshStandardMaterial({
+        map: stoneTex,
+        roughness: 0.9,
+        metalness: 0.05,
+        color: 0x6b5878,
+        emissive: 0x140a24,
+        emissiveIntensity: 0.6,
+      }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.5;

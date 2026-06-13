@@ -12,7 +12,10 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // Production sourcemaps are disabled (ships zero .map files to the CDN,
+    // reducing bundle size and hiding implementation details from the public).
+    // Dev mode still generates inline sourcemaps (Vite default: 'inline').
+    sourcemap: false,
     chunkSizeWarningLimit: 1500,
   },
 });

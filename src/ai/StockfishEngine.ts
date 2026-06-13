@@ -10,10 +10,19 @@ export interface BestMoveResult {
   ponderMove?: string;
 }
 
+/** Hard upper bound (ms) before we forcibly stop and warn. Prevents infinite hangs. */
+const BESTMOVE_TIMEOUT_MS = 10_000;
+
 export class StockfishEngine {
   private worker: Worker | null = null;
   private msgListeners: Array<(line: string) => void> = [];
   private ready = false;
+  /**
+   * Incremented every time stop() or dispose() is called.
+   * bestMove() captures the generation at entry; if it changes before bestmove
+   * arrives, the result is silently discarded (stale search from a previous game).
+   */
+  private generation = 0;
 
   async init(): Promise<void> {
     if (this.worker) return;
@@ -46,9 +55,19 @@ export class StockfishEngine {
     this.post(`setoption name UCI_Elo value ${Math.max(1320, Math.min(3190, elo))}`);
   }
 
+  disableLimitStrength() {
+    this.post('setoption name UCI_LimitStrength value false');
+  }
+
   /**
    * Ask the engine for the best move given current FEN + movetime budget.
-   * Resolves once `bestmove <uci>` arrives.
+   * Resolves once `bestmove <uci>` arrives, or null on timeout/stop.
+   *
+   * multiPV: if > 1, requests N candidate moves and returns one chosen by
+   * the caller-supplied selector. The engine still responds with a single
+   * bestmove line; the candidates appear in "info ... multipv N score cp ..."
+   * lines. We collect them and pass to the selector so the caller can pick
+   * randomly among the top moves for opening variety.
    *
    * UCI hygiene matters: skipping the `readyok` wait between commands
    * makes the WASM build trap with "unreachable" after several searches
@@ -56,25 +75,96 @@ export class StockfishEngine {
    * the board). So we explicitly wait for `readyok` after `ucinewgame` and
    * after `position fen` before issuing `go`.
    */
-  async bestMove(fen: string, movetimeMs = 1000): Promise<BestMoveResult | null> {
+  async bestMove(
+    fen: string,
+    movetimeMs = 1000,
+    multiPV = 1,
+    selectCandidate?: (candidates: BestMoveResult[]) => BestMoveResult
+  ): Promise<BestMoveResult | null> {
     if (!this.worker) throw new Error('Engine not initialized');
+
     // Belt-and-suspenders: halt any prior search before queuing new commands.
     this.post('stop');
     this.post('ucinewgame');
     await this.send('isready', (line) => line === 'readyok');
     this.post(`position fen ${fen}`);
     await this.send('isready', (line) => line === 'readyok');
-    return new Promise((resolve) => {
+
+    // Snapshot the generation counter. If stop()/dispose() runs while we
+    // are awaiting bestmove, the generation will have changed and we discard
+    // the stale result rather than deliver it to a new game.
+    const capturedGen = this.generation;
+
+    if (multiPV > 1) {
+      this.post(`setoption name MultiPV value ${multiPV}`);
+    }
+
+    return new Promise<BestMoveResult | null>((resolve) => {
+      // Candidate moves collected from "info multipv" lines.
+      const candidates: BestMoveResult[] = [];
+
       const cleanup = this.addListener((line) => {
+        // Collect MultiPV info lines: "info depth X multipv N score cp ... pv <move> ..."
+        if (multiPV > 1 && line.includes('multipv') && line.includes(' pv ')) {
+          const pvMatch = / pv ([a-h][1-8][a-h][1-8][qrbn]?)/.exec(line);
+          if (pvMatch) {
+            const mvResult = parseUCI(pvMatch[1]);
+            // Store by multipv rank (1-based), overwrite on deeper iteration.
+            const rankMatch = /multipv (\d+)/.exec(line);
+            const rank = rankMatch ? parseInt(rankMatch[1], 10) : candidates.length + 1;
+            candidates[rank - 1] = mvResult;
+          }
+        }
+
         if (line.startsWith('bestmove')) {
-          // bestmove e2e4 ponder e7e5
+          clearTimeout(timeoutHandle);
           const parts = line.split(/\s+/);
           const uci = parts[1] ?? '(none)';
           cleanup();
-          if (uci === '(none)' || !uci) return resolve(null);
-          resolve(parseUCI(uci));
+
+          // Reset MultiPV to 1 after use so it does not bleed into the next search.
+          if (multiPV > 1) {
+            this.post('setoption name MultiPV value 1');
+          }
+
+          // Discard stale results from a previous game/stop cycle.
+          if (this.generation !== capturedGen) {
+            resolve(null);
+            return;
+          }
+
+          if (uci === '(none)' || !uci) {
+            resolve(null);
+            return;
+          }
+
+          const engineBest = parseUCI(uci);
+
+          // If MultiPV collected candidates and a selector was provided, use it.
+          if (multiPV > 1 && candidates.length > 0 && selectCandidate) {
+            // Ensure at least the engine's own best is in the list.
+            if (!candidates[0]) candidates[0] = engineBest;
+            resolve(selectCandidate(candidates.filter(Boolean)));
+            return;
+          }
+
+          resolve(engineBest);
         }
       });
+
+      // Hard timeout: if bestmove never arrives, stop the search and warn.
+      const timeoutHandle = setTimeout(() => {
+        console.warn(
+          `[StockfishEngine] bestmove timeout after ${BESTMOVE_TIMEOUT_MS}ms, sending stop.`
+        );
+        this.post('stop');
+        cleanup();
+        if (multiPV > 1) {
+          this.post('setoption name MultiPV value 1');
+        }
+        resolve(null);
+      }, BESTMOVE_TIMEOUT_MS);
+
       this.post(`go movetime ${movetimeMs}`);
     });
   }
@@ -87,10 +177,12 @@ export class StockfishEngine {
     }
     this.msgListeners = [];
     this.ready = false;
+    this.generation += 1; // invalidate any in-flight bestMove promise
   }
 
-  /** Stop any in-flight search. */
+  /** Stop any in-flight search. Does NOT tear down the worker. */
   stop() {
+    this.generation += 1; // invalidate any in-flight bestMove promise
     this.post('stop');
   }
 

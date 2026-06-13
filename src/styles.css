@@ -470,6 +470,78 @@ body {
   to { opacity: 1; }
 }
 
+/* =================== PROMOTION PICKER =================== */
+/* Mounted on document.body (not #ui-root) so it sits above the canvas and
+ * captures its own pointer events. Styled like the game-over card. */
+.promotion-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 5, 14, 0.35) 0%, rgba(0, 0, 0, 0.7) 100%);
+  pointer-events: auto;
+  animation: fadeIn 0.25s ease-out;
+}
+.promotion-card {
+  padding: 24px 28px;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.96), rgba(12, 8, 18, 0.98));
+  border: 1px solid rgba(196, 122, 60, 0.6);
+  border-radius: 8px;
+  text-align: center;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(196, 122, 60, 0.2),
+    inset 0 1px 0 rgba(247, 230, 169, 0.2);
+}
+.promotion-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #f7e6a9;
+  margin-bottom: 16px;
+}
+.promotion-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.promotion-choice {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: #f3e9c8;
+  background: linear-gradient(180deg, rgba(40, 24, 56, 0.9), rgba(20, 12, 28, 0.95));
+  border: 1px solid rgba(196, 122, 60, 0.5);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+.promotion-choice:hover {
+  background: linear-gradient(180deg, rgba(60, 36, 80, 0.95), rgba(30, 18, 42, 0.98));
+  border-color: rgba(247, 230, 169, 0.8);
+  box-shadow: 0 6px 22px rgba(196, 122, 60, 0.35);
+}
+.promotion-choice:active {
+  transform: scale(0.95);
+  border-color: rgba(247, 230, 169, 0.9);
+}
+@media (max-width: 720px), (max-height: 540px) {
+  .promotion-card { padding: 18px 18px; }
+  .promotion-choice { width: 52px; height: 52px; font-size: 2rem; }
+  .promotion-row { gap: 8px; }
+}
+
 /* =================== RESPONSIVE — PHONES & SMALL TABLETS =================== */
 
 /*
@@ -605,4 +677,665 @@ body {
   }
   .hud-btn { min-height: 40px; padding: 8px 12px; font-size: 0.7rem; }
   .hud-hint { display: none; }
+}
+
+/* =================== RETENTION LAYER (profile, onboarding, share) =========== */
+
+/* Compact profile chip: top-left, mirrors the turn-card aesthetic. */
+.profile-chip {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, rgba(20, 12, 28, 0.85), rgba(8, 5, 12, 0.85));
+  border: 1px solid rgba(196, 122, 60, 0.45);
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(247, 230, 169, 0.18);
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: #f3e9c8;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.profile-chip:hover {
+  border-color: rgba(247, 230, 169, 0.7);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 18px rgba(196, 122, 60, 0.3);
+}
+.profile-chip .chip-label { color: #c9a566; }
+.profile-chip strong { color: #f7e6a9; }
+.profile-chip .chip-sep { opacity: 0.4; margin: 0 2px; }
+.profile-chip .chip-flame {
+  color: #ff9a4a;
+  text-shadow: 0 0 10px rgba(255, 122, 74, 0.7);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* "?" help button: top-right, opens onboarding. */
+.help-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(40, 24, 56, 0.85), rgba(20, 12, 28, 0.9));
+  border: 1px solid rgba(196, 122, 60, 0.5);
+  border-radius: 50%;
+  color: #f3e9c8;
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(247, 230, 169, 0.15);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.help-btn:hover {
+  background: linear-gradient(180deg, rgba(60, 36, 80, 0.9), rgba(30, 18, 42, 0.95));
+  border-color: rgba(247, 230, 169, 0.7);
+}
+.help-btn:active { transform: scale(0.94); }
+
+/* Transient locked-entry toast, centered above the controls. */
+.hud-toast {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  max-width: min(90vw, 420px);
+  padding: 10px 18px;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.96), rgba(12, 8, 18, 0.98));
+  border: 1px solid rgba(196, 122, 60, 0.6);
+  border-radius: 6px;
+  color: #f3e9c8;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1rem;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+.hud-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Onboarding overlay (F16): single screen, gothic palette. */
+.onboarding-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 5, 14, 0.55) 0%, rgba(0, 0, 0, 0.85) 100%);
+  pointer-events: auto;
+  animation: fadeIn 0.4s ease-out;
+  z-index: 70;
+  padding: 20px;
+}
+.onboarding-card {
+  max-width: 540px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px 36px;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.97), rgba(12, 8, 18, 0.99));
+  border: 1px solid rgba(196, 122, 60, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 70px rgba(196, 122, 60, 0.22), inset 0 1px 0 rgba(247, 230, 169, 0.2);
+}
+.onboarding-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 900;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f7e6a9;
+  text-shadow: 0 0 22px rgba(247, 230, 169, 0.45);
+  text-align: center;
+  margin-bottom: 1.2rem;
+}
+.onboarding-section { margin-bottom: 1.1rem; }
+.onboarding-heading {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c9a566;
+  margin-bottom: 0.35rem;
+}
+.onboarding-card p {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: #e7dcc0;
+}
+.onboarding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.onboarding-list li {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #e7dcc0;
+  padding-left: 16px;
+  position: relative;
+}
+.onboarding-list li::before {
+  content: '\265F';
+  position: absolute;
+  left: 0;
+  color: #c47a3c;
+}
+.onboarding-list strong { color: #f7e6a9; }
+.onboarding-progress p { color: #c9a566; font-style: italic; }
+.onboarding-dismiss {
+  display: block;
+  margin: 1.2rem auto 0;
+}
+
+/* Profile popover (F2/F17): record + share. */
+.profile-popover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 5, 14, 0.45) 0%, rgba(0, 0, 0, 0.8) 100%);
+  pointer-events: auto;
+  animation: fadeIn 0.25s ease-out;
+  z-index: 65;
+  padding: 20px;
+}
+.profile-popover-card {
+  max-width: 400px;
+  width: 100%;
+  padding: 28px 32px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.97), rgba(12, 8, 18, 0.99));
+  border: 1px solid rgba(196, 122, 60, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(247, 230, 169, 0.2);
+}
+.profile-popover-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #f7e6a9;
+  margin-bottom: 1.2rem;
+}
+.profile-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+  margin-bottom: 1.4rem;
+}
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+  background: rgba(20, 12, 28, 0.6);
+  border: 1px solid rgba(196, 122, 60, 0.3);
+  border-radius: 6px;
+}
+.profile-stat span {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c9a566;
+  margin-bottom: 4px;
+}
+.profile-stat strong {
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+  color: #f7e6a9;
+}
+
+/* Game-over modal enrichment (F2/F17). */
+.game-over-moves {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  color: #c9a566;
+  margin-bottom: 0.8rem;
+}
+.game-over-streak {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  color: #ff9a4a;
+  text-shadow: 0 0 14px rgba(255, 122, 74, 0.55);
+  margin-bottom: 1rem;
+}
+.game-over-streak.muted {
+  color: #9a8a6a;
+  text-shadow: none;
+}
+.game-over-stats {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.4rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: #c9a566;
+}
+.game-over-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.game-over-actions .hud-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  filter: grayscale(0.3);
+}
+
+/* ---- Online live-game controls (F8 / F18 / draw / rematch) ---- */
+
+/* Per-player Fischer clocks (F18), one under each captured tray. */
+.player-clock {
+  margin-top: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: #f3e9c8;
+  padding: 4px 0;
+  border-top: 1px solid rgba(196, 122, 60, 0.3);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+.player-clock.running {
+  color: #f7e6a9;
+  text-shadow: 0 0 16px rgba(247, 230, 169, 0.6);
+}
+.player-clock.low {
+  color: #ff7a4a;
+  text-shadow: 0 0 16px rgba(255, 122, 74, 0.7);
+}
+.player-clock.running.low {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* Resign / Offer Draw cluster, bottom-left so it does not collide with the
+   bottom-right hud-controls stack. Shown only during an active online game. */
+.online-actions {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  pointer-events: auto;
+  z-index: 20;
+}
+.online-resign {
+  border-color: rgba(196, 60, 60, 0.6);
+  color: #ffd2c2;
+}
+.online-resign:hover {
+  border-color: rgba(255, 90, 90, 0.85);
+  box-shadow: 0 6px 22px rgba(196, 60, 60, 0.35), inset 0 1px 0 rgba(247, 230, 169, 0.2);
+}
+
+/* Opponent presence dot in the online panel (F8). */
+.online-presence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: #c9a566;
+}
+.presence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #5a5a5a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.presence-dot.online {
+  background: #5ad07a;
+  box-shadow: 0 0 10px rgba(90, 208, 122, 0.8);
+}
+.presence-dot.offline {
+  background: #c44;
+  box-shadow: 0 0 8px rgba(204, 68, 68, 0.6);
+}
+
+/* Incoming draw-offer prompt (top-center, non-blocking). */
+.draw-prompt {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(28, 16, 40, 0.97), rgba(12, 8, 18, 0.97));
+  border: 1px solid rgba(196, 122, 60, 0.6);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+  pointer-events: auto;
+  z-index: 40;
+  animation: fadeIn 0.3s ease-out;
+}
+.draw-prompt-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: #f3e9c8;
+}
+
+/* Disconnect banner with countdown + Claim Win (F8). */
+.disconnect-banner {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 92vw;
+  padding: 12px 20px;
+  background: linear-gradient(180deg, rgba(48, 18, 18, 0.97), rgba(20, 8, 8, 0.97));
+  border: 1px solid rgba(196, 60, 60, 0.7);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(196, 60, 60, 0.25);
+  pointer-events: auto;
+  z-index: 45;
+  animation: fadeIn 0.3s ease-out;
+}
+.disconnect-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: #ffd2c2;
+}
+.disconnect-text strong {
+  color: #f7e6a9;
+  font-style: normal;
+}
+
+@media (max-width: 720px), (max-height: 540px) {
+  .profile-chip { top: 10px; left: 6px; font-size: 0.62rem; padding: 6px 10px; }
+  .help-btn { top: 10px; right: 6px; width: 34px; height: 34px; font-size: 1.05rem; }
+  .hud-toast { bottom: 130px; font-size: 0.9rem; }
+  .onboarding-card { padding: 24px 22px; }
+  .profile-stats { grid-template-columns: 1fr 1fr; }
+  .player-clock { font-size: 1.1rem; margin-top: 6px; }
+  .online-actions { bottom: 84px; left: 6px; gap: 6px; }
+  .draw-prompt, .disconnect-banner {
+    top: 92px; flex-direction: column; gap: 8px; padding: 10px 14px; text-align: center;
+  }
+  .draw-prompt-text, .disconnect-text { font-size: 0.9rem; }
+}
+
+/* ============== CINEMATIC ENDGAME LETTERBOX (F13) ==============
+ * Two black bars that ease in over the canvas during the checkmate / draw camera
+ * sequence to give a brief cinematic frame, then ease back out when the modal
+ * appears. Driven by body.cinematic-endgame toggled by the CameraDirector. The
+ * bars sit above the canvas but below the HUD / game-over modal and never take
+ * pointer events, so a click still skips the sequence. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleY(0);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+body::before { top: 0; transform-origin: top; }
+body::after { bottom: 0; transform-origin: bottom; }
+body.cinematic-endgame::before,
+body.cinematic-endgame::after {
+  opacity: 1;
+  transform: scaleY(1);
+}
+/* Respect reduced-motion: the director never adds the class under reduced-motion,
+ * but disable the transition too so any forced state is instant. */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after { transition: none; }
+}
+
+/* ============== DAILY PUZZLE (F3) ==============
+ * Gothic palette, consistent with the existing HUD cards. The puzzle panel
+ * floats over the HUD in the bottom-right corner and shows loading / active /
+ * solved / error states. */
+
+/* "Daily" HUD button pulse when today's puzzle is unsolved. */
+.daily-btn-unsolved {
+  animation: dailyPulse 2.6s ease-in-out infinite;
+  border-color: #f7d47a !important;
+  color: #f7d47a !important;
+}
+.daily-btn-solved {
+  opacity: 0.6;
+}
+@keyframes dailyPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(247, 212, 122, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(247, 212, 122, 0.35); }
+}
+
+/* Puzzle panel card (bottom-right, above the captured trays z-layer). */
+.puzzle-panel {
+  position: fixed;
+  bottom: 120px;
+  right: 14px;
+  width: min(300px, 90vw);
+  background: linear-gradient(160deg, rgba(20, 10, 30, 0.96) 0%, rgba(10, 6, 18, 0.97) 100%);
+  border: 1px solid rgba(196, 122, 60, 0.5);
+  border-radius: 8px;
+  padding: 14px 16px;
+  z-index: 40;
+  pointer-events: all;
+  color: #f3e9c8;
+  font-family: 'Cormorant Garamond', serif;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+  transition: border-color 0.25s ease;
+}
+
+/* Wrong-move flash: border turns red briefly. */
+.puzzle-panel.puzzle-flash-wrong {
+  border-color: rgba(220, 60, 60, 0.9);
+  animation: puzzleWrongFlash 0.55s ease forwards;
+}
+@keyframes puzzleWrongFlash {
+  0% { border-color: rgba(220, 60, 60, 0.9); }
+  100% { border-color: rgba(196, 122, 60, 0.5); }
+}
+
+.puzzle-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.puzzle-panel-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  color: #f7e6a9;
+  flex: 1;
+}
+
+.puzzle-source {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.04em;
+}
+.puzzle-source.lichess {
+  background: rgba(98, 190, 127, 0.2);
+  border: 1px solid rgba(98, 190, 127, 0.5);
+  color: #7ed9a0;
+}
+.puzzle-source.fallback {
+  background: rgba(196, 122, 60, 0.2);
+  border: 1px solid rgba(196, 122, 60, 0.45);
+  color: #e0a060;
+}
+
+.puzzle-instructions {
+  font-size: 0.82rem;
+  color: #c9a566;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+/* Progress dots row. */
+.puzzle-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.puzzle-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(247, 230, 169, 0.15);
+  border: 1px solid rgba(247, 230, 169, 0.3);
+  transition: background 0.3s, border-color 0.3s;
+}
+.puzzle-dot.done {
+  background: rgba(98, 190, 127, 0.7);
+  border-color: rgba(98, 190, 127, 0.9);
+}
+.puzzle-dot.current {
+  background: rgba(247, 212, 122, 0.6);
+  border-color: rgba(247, 212, 122, 0.9);
+  box-shadow: 0 0 5px rgba(247, 212, 122, 0.4);
+}
+
+/* Attempt counter - turns red + animates on wrong move. */
+.puzzle-attempts {
+  font-size: 0.75rem;
+  color: rgba(220, 100, 80, 0.9);
+  min-height: 1em;
+  margin-bottom: 8px;
+  transition: color 0.2s;
+}
+.puzzle-attempts.puzzle-wrong-flash {
+  animation: wrongFlashText 0.55s ease;
+}
+@keyframes wrongFlashText {
+  0% { color: rgba(240, 50, 50, 1); transform: translateX(-3px); }
+  25% { transform: translateX(3px); }
+  50% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+  100% { color: rgba(220, 100, 80, 0.9); transform: translateX(0); }
+}
+
+/* Solved state banner. */
+.puzzle-solved-banner {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f7e6a9;
+  text-shadow: 0 0 12px rgba(247, 212, 122, 0.6);
+  margin-bottom: 6px;
+}
+.puzzle-streak {
+  font-size: 0.82rem;
+  color: #f7c44a;
+  margin-bottom: 4px;
+}
+.puzzle-attempts-final {
+  font-size: 0.8rem;
+  color: #c9a566;
+  margin-bottom: 10px;
+}
+
+/* Loading state. */
+.puzzle-loading {
+  font-size: 0.82rem;
+  color: #c9a566;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+@keyframes puzzleLoadingDots {
+  0% { content: '.'; }
+  33% { content: '..'; }
+  66% { content: '...'; }
+}
+.puzzle-loading-dots {
+  display: inline-block;
+  animation: puzzleLoadingDots 1.2s linear infinite;
+  width: 1.5em;
+}
+
+/* Error state. */
+.puzzle-error {
+  font-size: 0.8rem;
+  color: rgba(220, 80, 60, 0.9);
+  margin-bottom: 10px;
+}
+
+/* Action buttons row. */
+.puzzle-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.puzzle-exit-btn,
+.puzzle-share-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  margin-top: 4px;
+}
+
+/* Phone / small-screen tweaks. */
+@media (max-width: 520px) {
+  .puzzle-panel {
+    bottom: 100px;
+    right: 6px;
+    width: calc(100vw - 12px);
+    max-width: 320px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .daily-btn-unsolved { animation: none; }
+  .puzzle-panel.puzzle-flash-wrong { animation: none; }
+  .puzzle-attempts.puzzle-wrong-flash { animation: none; }
 }

@@ -18,6 +18,14 @@ export class Board {
   private readonly highlights = new Map<string, THREE.Mesh>();
   /** Hidden pickable plane for each square (for raycasting empty squares) */
   readonly pickPlanes: THREE.Mesh[] = [];
+  /**
+   * Persistent from/to tint of the most-recent move (independent of selection
+   * highlights, which clear on deselect). Two flat amber overlays kept until the
+   * next move replaces them.
+   */
+  private lastMoveMeshes: THREE.Mesh[] = [];
+  /** Pulsing red ring under the king currently in check (null when no check). */
+  private checkRing: THREE.Mesh | null = null;
 
   constructor() {
     this.buildSlab();
@@ -196,11 +204,56 @@ export class Board {
     this.highlights.clear();
   }
 
+  /**
+   * Persistently tint the from/to squares of the most-recent move. Pass null to
+   * clear (used on reset). These overlays sit BELOW the selection highlights and
+   * survive deselect, so the last move stays visible until the next one.
+   */
+  setLastMove(squares: { from: SquareCoord; to: SquareCoord } | null) {
+    for (const m of this.lastMoveMeshes) {
+      this.group.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.lastMoveMeshes = [];
+    if (!squares) return;
+    for (const c of [squares.from, squares.to]) {
+      const mesh = makeLastMoveMesh();
+      mesh.position.copy(squareToWorld(c, 0.155));
+      this.group.add(mesh);
+      this.lastMoveMeshes.push(mesh);
+    }
+  }
+
+  /**
+   * Place a pulsing red ring under the checked king, or clear it (pass null)
+   * once the check is resolved.
+   */
+  setCheckSquare(coord: SquareCoord | null) {
+    if (this.checkRing) {
+      this.group.remove(this.checkRing);
+      this.checkRing.geometry.dispose();
+      (this.checkRing.material as THREE.Material).dispose();
+      this.checkRing = null;
+    }
+    if (!coord) return;
+    const ring = makeCheckRingMesh();
+    ring.position.copy(squareToWorld(coord, 0.18));
+    this.group.add(ring);
+    this.checkRing = ring;
+  }
+
   /** Animate the highlight rings (called from render loop). */
   tickHighlights(t: number) {
     for (const m of this.highlights.values()) {
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.55 + Math.sin(t * 4 + m.id) * 0.18;
+    }
+    if (this.checkRing) {
+      const mat = this.checkRing.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.6 + Math.sin(t * 6) * 0.32;
+      const s = 1 + Math.sin(t * 6) * 0.1;
+      this.checkRing.scale.set(s, s, 1);
     }
   }
 }
@@ -279,6 +332,40 @@ function makeHighlightMesh(kind: 'move' | 'capture' | 'selected'): THREE.Mesh {
     color,
     transparent: true,
     opacity: 0.7,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(ring, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/**
+ * Flat amber square overlay marking a from/to square of the last move. Distinct
+ * from the green/red/gold selection RINGS: this is a filled translucent plane so
+ * the two systems read differently and can coexist.
+ */
+function makeLastMoveMesh(): THREE.Mesh {
+  const plane = new THREE.PlaneGeometry(SQUARE_SIZE * 0.92, SQUARE_SIZE * 0.92);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xf2b94a,
+    transparent: true,
+    opacity: 0.28,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(plane, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/** Bold red ring drawn under a king in check; pulses via tickHighlights. */
+function makeCheckRingMesh(): THREE.Mesh {
+  const ring = new THREE.RingGeometry(0.42, 0.6, 40);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xff2a1a,
+    transparent: true,
+    opacity: 0.85,
     side: THREE.DoubleSide,
     depthWrite: false,
   });

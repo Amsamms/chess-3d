@@ -1,9 +1,32 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { PostFX } from './PostFX';
+import { CameraDirector } from './CameraDirector';
 import { EnvironmentManager } from '../environments/EnvironmentManager';
 import { EnvironmentName } from '../environments/Environment';
 import { Quality, QualityMode } from './Quality';
+
+/**
+ * Per-realm image-based-lighting intensity. Image based lighting (IBL) makes
+ * metalness 0.85-0.95 surfaces read as real metal instead of flat plastic, so
+ * every realm gets a tuned scene.environmentIntensity:
+ *   - gothic-night: low so the moody near-black mood survives.
+ *   - garden-day: bright, sunny daylight bounce.
+ *   - ice-realm: cool, crisp reflections.
+ *   - volcano: moderate so glowing emissives are not washed out by bloom.
+ */
+const ENV_INTENSITY: Record<EnvironmentName, number> = {
+  'gothic-night': 0.55,
+  'garden-day': 1.0,
+  'ice-realm': 0.8,
+  'volcano': 0.6,
+};
+
+/** Largest dt (seconds) we ever feed to time-based updates. A backgrounded
+ * tab pauses requestAnimationFrame, so the first frame back can report a huge
+ * delta; clamping it keeps ambient particles from teleporting offscreen. */
+const MAX_DT = 0.1;
 
 export class SceneManager {
   readonly scene = new THREE.Scene();
@@ -12,8 +35,12 @@ export class SceneManager {
   readonly controls: OrbitControls;
   readonly post: PostFX;
   readonly env: EnvironmentManager;
+  /** Owns all climactic camera cinematics (intro orbit, capture juice, endgame). */
+  readonly director: CameraDirector;
   private readonly clock = new THREE.Clock();
   private currentEnvName: EnvironmentName = 'gothic-night';
+  /** dt (seconds) sampled once per frame in update(), reused by render(). */
+  private frameDt = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -28,8 +55,24 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = Quality.shadowsEnabled();
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.3; // gothic-night default; setEnvironment() re-tunes per realm
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // --- Image based lighting (IBL) ---
+    // Bake a soft room environment into a PMREM once at boot and use it as the
+    // scene environment map. Without this, metalness 0.85-0.95 gold/silver/molten
+    // surfaces have nothing to reflect and read as flat plastic. environmentIntensity
+    // is re-tuned per realm in setEnvironment() so each mood is preserved.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    pmrem.compileEquirectangularShader();
+    const roomScene = new RoomEnvironment();
+    this.scene.environment = pmrem.fromScene(roomScene, 0.04).texture;
+    this.scene.environmentIntensity = ENV_INTENSITY['gothic-night'];
+    roomScene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.geometry?.dispose();
+    });
+    pmrem.dispose();
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 240);
     this.camera.position.set(0, 18, 22);
@@ -44,8 +87,13 @@ export class SceneManager {
     this.controls.minPolarAngle = Math.PI * 0.08;
     this.controls.target.set(0, 0.5, 0);
 
+    // Camera cinematics director (F13). It either drives the camera directly
+    // (intro orbit / endgame dolly, with controls disabled) or layers decaying
+    // additive offsets on top of OrbitControls (capture shake / FOV punch).
+    this.director = new CameraDirector(this.camera, this.controls);
+
     this.env = new EnvironmentManager(this.scene);
-    this.env.set('gothic-night'); // default — restored to the look the user originally approved
+    this.env.set('gothic-night'); // default: restored to the look the user originally approved
 
     this.post = new PostFX(this.renderer, this.scene, this.camera);
     this.post.setSize(window.innerWidth, window.innerHeight);
@@ -61,11 +109,13 @@ export class SceneManager {
   setEnvironment(name: EnvironmentName) {
     this.currentEnvName = name;
     this.env.set(name);
-    // Re-tune renderer exposure / fog density depending on environment vibe.
-    // (Done inside the Environment via scene.background/fog; renderer-level tuning here.)
+    // Re-tune renderer exposure + IBL intensity / fog density depending on the
+    // environment vibe. (Sky/fog colors are owned by the Environment via
+    // scene.background/fog; renderer-level + IBL tuning lives here.)
+    this.scene.environmentIntensity = ENV_INTENSITY[name];
     switch (name) {
       case 'garden-day':   this.renderer.toneMappingExposure = 1.25; break;
-      case 'gothic-night': this.renderer.toneMappingExposure = 1.10; break;
+      case 'gothic-night': this.renderer.toneMappingExposure = 1.30; break;
       case 'ice-realm':    this.renderer.toneMappingExposure = 1.15; break;
       case 'volcano':      this.renderer.toneMappingExposure = 1.05; break;
     }
@@ -103,6 +153,9 @@ export class SceneManager {
     const computedVerticalDeg = THREE.MathUtils.radToDeg(computedVerticalRad);
     this.camera.fov = Math.max(45, Math.min(95, computedVerticalDeg));
     this.camera.updateProjectionMatrix();
+    // Publish the resting FOV so the director's FOV-punch offsets decay back to
+    // the correct framed value (it changes on portrait phones / resize).
+    this.director?.setBaseFov(this.camera.fov);
   }
 
   private onResize() {
@@ -114,13 +167,27 @@ export class SceneManager {
   }
 
   update(_dt: number) {
-    this.controls.update();
-    const dt = this.clock.getDelta();
-    this.env.update(dt);
+    // Sample the frame delta exactly once per frame here. render() reuses the
+    // same value, so getDelta() is never called twice (the second caller used
+    // to get ~0). Clamp so a backgrounded-tab catch-up frame does not explode
+    // ambient particle positions inside env.update().
+    this.frameDt = Math.min(this.clock.getDelta(), MAX_DT);
+
+    // Cinematics (F13): revert last frame's additive shake/FOV BEFORE controls
+    // integrate, so OrbitControls always works from the clean base transform
+    // (zero drift), then re-apply the decaying offsets AFTER controls.update().
+    // While a DRIVE cinematic is running we MUST skip controls.update() entirely:
+    // OrbitControls.update() recomputes camera.position from target + spherical on
+    // every call regardless of its enabled flag, which would overwrite the drive
+    // tween. The director owns the camera directly during a drive.
+    this.director.preControlsUpdate();
+    if (!this.director.isDriving()) this.controls.update();
+    this.director.update(this.frameDt);
+
+    this.env.update(this.frameDt);
   }
 
   render() {
-    const dt = this.clock.getDelta();
-    this.post.render(dt);
+    this.post.render(this.frameDt);
   }
 }

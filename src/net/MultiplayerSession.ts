@@ -392,21 +392,32 @@ export class MultiplayerSession {
       this.snapshot = rowToSnapshot(claimed);
       this.role = 'black';
     } else {
-      // Both slots taken and neither is me — fall back to spectator.
+      // Both slots taken and neither is me. This happens when you open a room
+      // link whose seats are both filled, or when you lost your previous
+      // anonymous identity (cleared storage, different device, incognito) so
+      // your old white_id / black_id no longer matches. Fall back to spectator;
+      // callers detect this via getRole() and show the watching UI rather than
+      // leaving the join spinner up.
       this.role = 'spectator';
     }
 
     this.lastAppliedPly = this.snapshot!.moves.length;
     await this.subscribe(this.snapshot!.id);
 
+    // myColor is meaningful only for players. For a spectator there is no own
+    // color, so report 'w' as a harmless placeholder and rely on getRole();
+    // callers (main.ts) already null this out when getRole() === 'spectator'.
+    const myColor: Color = this.role === 'black' ? 'b' : 'w';
     return {
-      myColor: this.role === 'white' ? 'w' : 'b',
+      myColor,
       fen: this.snapshot!.fen,
       moves: this.snapshot!.moves,
       opponentPresent:
         this.role === 'white'
           ? this.snapshot!.black_id !== null
-          : this.snapshot!.white_id !== null,
+          : this.role === 'black'
+            ? this.snapshot!.white_id !== null
+            : this.snapshot!.white_id !== null && this.snapshot!.black_id !== null,
     };
   }
 

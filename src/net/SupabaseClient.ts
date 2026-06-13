@@ -70,11 +70,27 @@ export async function signInAnon(): Promise<User> {
   if (cachedUser) return cachedUser;
   const sb = getClient();
 
-  // Re-use the persisted session if there is one.
-  const { data: existing } = await sb.auth.getUser();
-  if (existing.user) {
-    cachedUser = existing.user;
-    return existing.user;
+  // Re-use the persisted session if there is one. We read it with getSession()
+  // (which restores from localStorage WITHOUT a network round-trip) rather than
+  // getUser() (which validates the token against the server). This matters for
+  // reconnect: on a page reload we MUST recover the same anonymous UUID so we
+  // can reclaim our white_id / black_id seat in an in-progress game. If a
+  // transient network failure made getUser() return no user, the old code fell
+  // through and minted a BRAND-NEW UUID via signInAnonymously(), permanently
+  // stranding the player out of their own game. getSession() avoids that.
+  const { data: sessionData } = await sb.auth.getSession();
+  const existingSession = sessionData.session;
+  if (existingSession?.user) {
+    cachedUser = existingSession.user;
+    // Authorize the Realtime socket with the restored token. Without this, a
+    // reconnected client's channels stay unauthenticated and never receive the
+    // opponent's postgres_changes move events under RLS-enabled Realtime, so
+    // the board would silently stop syncing after a reload. The original code
+    // only called setAuth() on a fresh sign-in, never on session re-use.
+    if (existingSession.access_token) {
+      sb.realtime.setAuth(existingSession.access_token);
+    }
+    return existingSession.user;
   }
 
   const { data, error } = await sb.auth.signInAnonymously();
@@ -84,7 +100,7 @@ export async function signInAnon(): Promise<User> {
   // The Realtime websocket was opened during getClient() in an unauthenticated
   // state. Channels created BEFORE this point won't receive postgres_changes
   // events under default RLS-enabled Realtime settings. Push the new JWT into
-  // the realtime client so subsequent channels — and any reconnects — carry it.
+  // the realtime client so subsequent channels (and any reconnects) carry it.
   if (data.session?.access_token) {
     sb.realtime.setAuth(data.session.access_token);
   }

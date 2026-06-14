@@ -142,3 +142,29 @@ Ran two multi-agent workflows against the LIVE game (https://amsamms.github.io/c
 
 ### Session 3 follow-up (2026-06-14): online reconnect hardening
 Investigated the one online test failure (mp-reconnect-regression). Reproduced live: in a real browser the anonymous UUID persists across reload and joinRoom re-attaches to your seat, so the test failure was a headless-harness artifact (the test browser minted a new anon session on reload). Shipped two real robustness fixes anyway (src/net/SupabaseClient.ts signInAnon): use getSession() (localStorage, no network) instead of getUser() so a transient network failure cannot mint a new UUID and strand the player; and call realtime.setAuth() on the session-reuse path so a reconnected client's Realtime channels are authenticated and the opponent's moves keep syncing after reload (was a real latent bug). Clarified joinRoom spectator fallback. tsc clean, deployed (build index-C0mSDgle.js). The "online hard-reload reconnect" leftover from Session 3 is now resolved.
+
+### Session 3 follow-up 2 (2026-06-14): mid-game restyle + realm/mode audit
+
+User report: "when I change something mid-game, the game resets, for instance change the set, shouldn't these changes keep the ongoing game?" Then: "does changing the realm do the same? changing mode? the same?"
+
+Investigation findings (read the code, did not guess):
+- SET change WAS the bug. src/game/Game.ts setPieceSet() called this.reset() which does `this.chess = new Chess()` (Game.ts:312), wiping the position, history, and captured pieces. Wrong: a cosmetic look change must not cost you the game.
+- REALM change does NOT reset. main.ts:429 `ui.onEnvironmentChange((env) => scene.setEnvironment(env))`. SceneManager.setEnvironment (SceneManager.ts:109) only swaps the environment Group and re-tunes renderer exposure + IBL environmentIntensity per realm. Pieces live on scene.scene (owned by Game), not the env Group, so they survive. Already correct.
+- MODE change does NOT reset the board. main.ts applyMode (main.ts:380): to hotseat -> ai.stop() + clear thinking flag; to online -> ai.stop() + clear flag, panel drives create/join; to ai-vs-* -> ai.start(color, diff) from the CURRENT position. No game.reset() anywhere. Caveat: entering Online then creating/joining a room loads that room's separate game (not a reset of the local game).
+
+Fix (commit 83f759b, deployed):
+- Game.setPieceSet() now calls a new private restyleInPlace() instead of reset(). restyleInPlace: disposes the on-board meshes and the prison meshes, builds a fresh Prison + CaptureFX (mirrors reset()), respawns the board from this.chess.fen() in the new set via spawnAllFromFen() (which reads this.currentSet), re-seats captured pieces in the new set from the preserved capturedWhite/capturedBlack PieceType[] arrays, restores board.setLastMove(this.lastMoveSquares) and updateCheckRing(). Crucially it does NOT call new Chess() and does NOT fire afterResetListeners, so position, move history (threefold/50-move still valid), turn, captured pieces, last-move highlight, check ring, and the AI's role are all preserved.
+- Added Prison.seatInstant(piece) in src/vfx/Prison.ts: drops an already-captured piece straight into the next free cage slot with no animation, mirroring imprison()'s final resting transform (cage = color==='w' ? blackPrison : whitePrison; nextSlot(); cage.root.add(mesh); position=slot.position; scale 0.85; small random rotation).
+- capturedWhite/capturedBlack are PieceType[] (Game.ts:61-62), pushed on capture at Game.ts:734-735. Piece constructor is new Piece(color, type, coord, set). spawnAllFromFen uses this.currentSet at Game.ts:333.
+
+Verification + deploy:
+- tsc --noEmit PASS (exit 0), no em-dashes added.
+- NOT live-tested in a browser: the GPU-less WSL Playwright kept timing out (30s/call) and looked stuck; user stopped that attempt. Shipped on type-check + logic review (mirrors reset/loadPuzzleFen patterns), low risk.
+- Committed 83f759b, pushed master->main, built (asset index-n6MAFfYq.js, 299 KB gzip), dist force-pushed to gh-pages (13de828..c7a4db0). Production confirmed serving index-n6MAFfYq.js.
+- Manual verify steps for the live site: play moves + a capture, click Set to change style; position, turn, and caged captures should all persist, only the look changes.
+
+Operational note saved to memory (feedback-no-stuck-browser-retries): do not keep retrying flaky 30s-timeout Playwright under this GPU-less env; it reads as stuck. Switch to non-browser verification or ship + let Ahmed verify live.
+
+### Current live state (2026-06-14)
+- Repo github.com/Amsamms/chess-3d. Source on `main` HEAD 83f759b. Deployed `gh-pages` HEAD c7a4db0. Live https://amsamms.github.io/chess-3d/ serving index-n6MAFfYq.js. Supabase migration 003 applied. All $0/mo (GH Pages + Supabase free tier).
+- Commit chain on main: ea516dd (22 fixes) -> 722c4b7 (docs) -> a28189c (reconnect fix) -> 079f7e1 (docs) -> 83f759b (set restyle fix).

@@ -83,6 +83,25 @@ export class Prison {
     // Dust puff on landing
     // (Caller's VFXManager handles particle burst; Prison just lands the piece.)
   }
+
+  /**
+   * Drop an already-captured piece straight into the next free slot with no
+   * animation. Used when the piece set changes mid-game: the captured pieces are
+   * re-created in the new style and re-seated in their cages instantly, matching
+   * the final resting transform that imprison() produces.
+   */
+  seatInstant(piece: Piece): void {
+    const cage = piece.color === 'w' ? this.blackPrison : this.whitePrison;
+    const slot = cage.nextSlot();
+    if (!slot) return;
+    const mesh = piece.mesh;
+    mesh.visible = true;
+    mesh.scale.set(0.85, 0.85, 0.85);
+    mesh.userData.piece = piece;
+    cage.root.add(mesh);
+    mesh.position.copy(slot.position);
+    mesh.rotation.set(0.05, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.3);
+  }
 }
 
 /**

@@ -257,13 +257,65 @@ export class Game {
   }
   isAiThinking(): boolean { return this.aiThinking; }
 
-  /** Swap the active piece set + restart the game so all pieces use the new look. */
+  /**
+   * Swap the active piece set WITHOUT restarting the game. Every piece mesh (on
+   * the board and in the prison cages) is rebuilt in the new style, but the
+   * chess.js position, move history, turn, captured pieces, last-move highlight
+   * and check ring are all preserved so an in-progress game continues exactly
+   * where it was. (Changing the look is cosmetic; it must not cost you the game.)
+   */
   setPieceSet(set: PieceSetName) {
     if (this.currentSet === set) return;
     this.currentSet = set;
-    this.reset();
+    this.restyleInPlace();
   }
   getPieceSet(): PieceSetName { return this.currentSet; }
+
+  /** Rebuild all piece meshes in the current set while preserving game state. */
+  private restyleInPlace() {
+    // Dispose the on-board meshes. Crucially we do NOT touch this.chess or the
+    // captured arrays, so the position and history survive the restyle.
+    for (const p of this.pieces.values()) {
+      this.scene.scene.remove(p.mesh);
+      p.dispose();
+    }
+    this.pieces.clear();
+    this.squareMap.clear();
+
+    // Rebuild the prison with fresh empty cages (disposing the old captured
+    // meshes) plus a CaptureFX that references it, mirroring reset().
+    this.prison.group.traverse((o) => {
+      if (o.userData?.piece) {
+        const pp = o.userData.piece as Piece;
+        if (typeof (pp as { dispose?: () => void }).dispose === 'function') pp.dispose();
+      }
+    });
+    this.scene.scene.remove(this.prison.group);
+    const fresh = new Prison();
+    (this as unknown as { prison: Prison; captureFX: CaptureFX }).prison = fresh;
+    this.scene.scene.add(fresh.group);
+    (this as unknown as { captureFX: CaptureFX }).captureFX = new CaptureFX(this.scene.scene, this.vfx, fresh);
+
+    // The selected mesh is gone; drop any active selection and its highlights.
+    this.selected = null;
+    this.legalForSelected = [];
+    this.board.clearHighlights();
+
+    // Respawn the board from the current position in the new set.
+    this.spawnAllFromFen();
+
+    // Re-seat the captured pieces in the new set so the cages match the board.
+    // The origin coord is irrelevant: seatInstant drops the mesh into a slot.
+    const origin: SquareCoord = { fileIdx: 0, rankIdx: 0 };
+    for (const t of this.capturedWhite) fresh.seatInstant(new Piece('w', t, origin, this.currentSet));
+    for (const t of this.capturedBlack) fresh.seatInstant(new Piece('b', t, origin, this.currentSet));
+
+    // Restore the persistent board cues for the current position.
+    this.board.setLastMove(this.lastMoveSquares);
+    this.updateCheckRing();
+    // No new Chess() and no afterResetListeners: this is a restyle, not a
+    // restart, so the turn, position, and the AI's role are all unchanged.
+  }
 
   async init() {
     this.spawnAllFromFen();
